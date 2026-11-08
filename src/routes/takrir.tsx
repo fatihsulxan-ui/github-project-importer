@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { useStore } from "@/lib/store";
 import { groupLabel } from "@/lib/groups";
 import { localIso } from "@/lib/utils";
+import { shiftTakrirDate } from "@/lib/takrir";
+import { TakrirHistory } from "@/components/app/TakrirHistory";
 
 export const Route = createFileRoute("/takrir")({
   head: () => ({ meta: [
@@ -24,6 +26,8 @@ function Takrir() {
   const search = Route.useSearch();
   const [date, setDate] = useState(search.date ?? localIso());
   const [filter, setFilter] = useState<"all" | "verdi" | "vermedi">("all");
+  const today = localIso();
+  const selectDate = (next: string) => { setDate(next); setFilter("all"); };
   const session = takrirler.find((d) => d.date === date);
   const verdiCount = students.filter((s) => session?.results[s.id] === true).length;
   const visibleStudents = filter === "all" ? students : students.filter((s) => (session?.results[s.id] === true) === (filter === "verdi"));
@@ -38,11 +42,18 @@ function Takrir() {
     </div>
     <div className="mt-5 border-y border-border py-4">
       <label className="block text-xs font-medium text-muted-foreground" htmlFor="takrir-date">Takrir tarihi</label>
-      <div className="mt-2 flex min-w-0 items-center gap-2">
+      <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
+      <Button variant="outline" size="icon" className="h-11 w-9 shrink-0" aria-label="Önceki gün" title="Önceki gün" onClick={() => selectDate(shiftTakrirDate(date, -1))}><ArrowLeft /></Button>
       <div className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-lg border border-border bg-card px-3">
         <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <input id="takrir-date" aria-label="Takrir tarihi" type="date" value={date} onChange={(e) => { if (e.target.value) setDate(e.target.value); }} className="h-full w-full min-w-0 bg-transparent text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+        <input id="takrir-date" aria-label="Takrir tarihi" type="date" value={date} onChange={(e) => { if (e.target.value) selectDate(e.target.value); }} className="h-full w-full min-w-0 bg-transparent text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
       </div>
+      <Button variant="outline" size="icon" className="h-11 w-9 shrink-0" aria-label="Sonraki gün" title="Sonraki gün" onClick={() => selectDate(shiftTakrirDate(date, 1))}><ArrowLeft className="rotate-180" /></Button>
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-1 rounded-lg bg-surface p-1">
+        {([ [0, "Bugün"], [-1, "Dün"], [-2, "Dünden Önce"] ] as const).map(([offset, label]) => <Button key={offset} variant="ghost" size="sm" aria-pressed={date === shiftTakrirDate(today, offset)} onClick={() => selectDate(shiftTakrirDate(today, offset))} className={`px-1 text-xs ${date === shiftTakrirDate(today, offset) ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground" : "text-muted-foreground"}`}>{label}</Button>)}
+      </div>
+      <div className="mt-3 flex justify-end">
       {session ? <Button variant="outline" size="icon" aria-label="Takriri sil" title="Takriri sil" className="h-11 w-11 shrink-0 text-destructive" onClick={() => { if (confirm("Bu günün takririni silmek istiyor musunuz?")) removeTakrirDay(date); }}><Trash2 /></Button>
         : <Button className="h-11 shrink-0 gap-1.5 px-3 text-xs" disabled={!students.length} onClick={() => addTakrirDay(date)}><Plus className="h-4 w-4" />Takrir Oluştur</Button>}
       </div>
@@ -53,8 +64,8 @@ function Takrir() {
       </div>
       : <div className="mt-4">
         <div className="mb-3 flex items-center justify-between gap-2 text-sm">
-          <button type="button" aria-pressed={filter === "verdi"} onClick={() => setFilter((current) => current === "verdi" ? "all" : "verdi")} className={`rounded-md px-2 py-1 font-semibold transition-colors ${filter === "verdi" ? "bg-primary text-primary-foreground" : "text-primary hover:bg-accent"}`}>{verdiCount} verdi</button>
-          <button type="button" aria-pressed={filter === "vermedi"} onClick={() => setFilter((current) => current === "vermedi" ? "all" : "vermedi")} className={`rounded-md px-2 py-1 transition-colors ${filter === "vermedi" ? "bg-primary font-semibold text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"}`}>{students.length - verdiCount} vermedi</button>
+          <Button variant="ghost" size="sm" aria-pressed={filter === "verdi"} onClick={() => setFilter((current) => current === "verdi" ? "all" : "verdi")} className={filter === "verdi" ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground" : "text-primary"}>{verdiCount} verdi</Button>
+          <Button variant="ghost" size="sm" aria-pressed={filter === "vermedi"} onClick={() => setFilter((current) => current === "vermedi" ? "all" : "vermedi")} className={filter === "vermedi" ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground" : "text-muted-foreground"}>{students.length - verdiCount} vermedi</Button>
         </div>
         <div className="overflow-hidden rounded-lg border border-border bg-card">
         {visibleStudents.map((s) => {
@@ -69,5 +80,6 @@ function Takrir() {
         })}
         </div>
       </div>}
+    <TakrirHistory date={date} />
   </>;
 }

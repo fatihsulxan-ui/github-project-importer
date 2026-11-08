@@ -1,61 +1,55 @@
-import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PdfButton } from "@/components/app/PdfButton";
 import { useStore } from "@/lib/store";
 import { groupLabel } from "@/lib/groups";
-import { takrirDaysInRange, takrirWeeks, weekEnd, weekStart } from "@/lib/takrir";
-import { localIso } from "@/lib/utils";
+import { takrirDaysInRange, takrirReportRange } from "@/lib/takrir";
+import { Printer } from "@/components/app/icons";
 
 const fmt = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("tr-TR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 const short = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("tr-TR", { day: "numeric", month: "long" });
 
-/** All takrir days up to today, newest first, plus a weekly printable report. */
-export function TakrirHistory() {
+/** One export area anchored to the same date as the daily marks. */
+export function TakrirHistory({ date }: { date: string }) {
   const { students, takrirler, group } = useStore();
-  const [all, setAll] = useState(false);
-  const days = takrirDaysInRange(takrirler, "0000-01-01", localIso());
-  const ids = new Set(students.map((s) => s.id));
-  const shown = all ? days : days.slice(0, 7);
-  const weeks = takrirWeeks(takrirler);
-  const thisWeek = weekStart(localIso());
-  const options = weeks.includes(thisWeek) ? weeks : [thisWeek, ...weeks];
-  const [week, setWeek] = useState(options[0] ?? thisWeek);
-  const weekDays = takrirDaysInRange(takrirler, week, weekEnd(week));
+  const [period, setPeriod] = useState<"day" | "week">("day");
+  const [printing, setPrinting] = useState(false);
+  const [error, setError] = useState("");
+  const { from, to } = takrirReportRange(date, period);
+  const days = takrirDaysInRange(takrirler, from, to);
+  const hasRecords = days.some((d) => students.some((s) => s.id in d.results));
 
   const make = async () => {
     const { makeTakrirPdf } = await import("@/lib/takrir-pdf");
-    const blob = await makeTakrirPdf(students, weekDays, week, weekEnd(week), groupLabel(group));
-    return { blob, name: `takrir-raporu-${week}.pdf` };
+    const blob = await makeTakrirPdf(students, days, from, to, groupLabel(group));
+    return { blob, name: `takrir-raporu-${from}-${to}.pdf` };
   };
   const print = async () => {
     const w = window.open("", "_blank");
-    const { blob } = await make();
-    const url = URL.createObjectURL(blob);
-    if (w) w.location.href = url; else window.location.href = url;
+    setPrinting(true);
+    setError("");
+    try {
+      const { blob } = await make();
+      const url = URL.createObjectURL(blob);
+      if (w) w.location.href = url; else window.location.href = url;
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      w?.close();
+      setError("Rapor hazırlanamadı. Lütfen tekrar deneyin.");
+    } finally { setPrinting(false); }
   };
 
-  return <div className="overflow-hidden rounded-lg border border-border bg-card">
-    <div className="bg-muted px-3 py-2 text-xs font-medium text-muted-foreground">Geçmiş Takrirler</div>
-    {!days.length ? <p className="px-3 py-4 text-sm text-muted-foreground">Henüz takrir yok.</p> : shown.map((d) => {
-      const listed = Object.keys(d.results).filter((id) => ids.has(id));
-      const verdi = listed.filter((id) => d.results[id]).length;
-      return <Link key={d.id} to="/takrir" search={{ date: d.date }} className="flex items-center justify-between gap-3 border-t border-border px-3 py-3 text-sm first:border-t-0 hover:bg-accent">
-        <span className="font-medium capitalize">{fmt(d.date)}</span>
-        <span className="shrink-0"><span className="font-semibold text-primary">{verdi} verdi</span> · <span className="text-muted-foreground">{listed.length - verdi} vermedi</span></span>
-      </Link>;
-    })}
-    {days.length > 7 && <Button variant="ghost" className="w-full rounded-none border-t border-border" onClick={() => setAll((v) => !v)}>{all ? "Daha az göster" : `Tümünü göster (${days.length})`}</Button>}
-    <div className="space-y-2 border-t border-border p-3">
-      <label htmlFor="takrir-week" className="block text-xs font-medium text-muted-foreground">Haftalık takrir raporu</label>
-      <select id="takrir-week" value={week} onChange={(e) => setWeek(e.target.value)} className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm">
-        {options.map((w) => <option key={w} value={w}>{short(w)} – {short(weekEnd(w))}{w === thisWeek ? " (bu hafta)" : ""}</option>)}
-      </select>
-      <p className="text-xs text-muted-foreground">{weekDays.length ? `${weekDays.length} takrir günü` : "Bu hafta takrir yok."}</p>
-      <div className="grid grid-cols-2 gap-2">
-        <PdfButton make={make} depsKey={`${week}-${JSON.stringify(weekDays)}-${students.length}`} label="PDF İndir" className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-background text-sm font-medium hover:bg-accent disabled:opacity-50" />
-        <Button variant="outline" className="h-11" disabled={!weekDays.length} onClick={print}>Yazdır</Button>
+  return <section aria-label="Takrir raporu" className="mt-6 space-y-3 border-t border-border py-4">
+      <h3 className="text-sm font-semibold">Takrir Raporu</h3>
+      <div className="grid grid-cols-2 gap-1 rounded-lg bg-surface p-1">
+        {([ ["day", "Seçili Gün"], ["week", "Seçili Hafta"] ] as const).map(([value, label]) => <Button key={value} variant="ghost" size="sm" aria-pressed={period === value} onClick={() => setPeriod(value)} className={period === value ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground" : "text-muted-foreground"}>{label}</Button>)}
       </div>
-    </div>
-  </div>;
+      <p className="text-xs text-muted-foreground">{period === "day" ? fmt(from) : `${short(from)} – ${short(to)} ${to.slice(0, 4)}`}</p>
+      {!hasRecords && <p className="text-xs text-muted-foreground">Bu dönemde takrir kaydı yok.</p>}
+      <div className="grid grid-cols-2 gap-2">
+        {hasRecords ? <PdfButton key={`${group}-${from}-${to}`} make={make} depsKey={`${group}-${from}-${to}-${JSON.stringify(days)}-${JSON.stringify(students)}`} label="PDF İndir" className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-background text-sm font-medium hover:bg-accent disabled:opacity-50" /> : <Button variant="outline" className="h-11" disabled>PDF İndir</Button>}
+        <Button variant="outline" className="h-11" disabled={!hasRecords || printing} onClick={() => void print()}><Printer />{printing ? "Hazırlanıyor…" : "Yazdır"}</Button>
+      </div>
+      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+  </section>;
 }

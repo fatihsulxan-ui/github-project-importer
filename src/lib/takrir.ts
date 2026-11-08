@@ -30,6 +30,18 @@ export type TakrirRange = "dun" | "bu-hafta" | "gecen-hafta";
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
+/** Calendar-day navigation, including month/year boundaries and daylight-saving days. */
+export function shiftTakrirDate(date: string, offset: number): string {
+  const d = new Date(`${date}T12:00:00`);
+  d.setDate(d.getDate() + offset);
+  return iso(d);
+}
+
+export function takrirReportRange(date: string, period: "day" | "week"): { from: string; to: string } {
+  const from = period === "day" ? date : weekStart(date);
+  return { from, to: period === "day" ? date : weekEnd(from) };
+}
+
 /** Inclusive [from, to] ISO dates; weeks run Monday–Sunday. */
 export function takrirRange(range: TakrirRange, today: Date): { from: string; to: string } {
   const d = new Date(today.getFullYear(), today.getMonth(), today.getDate());

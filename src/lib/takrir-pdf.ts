@@ -12,7 +12,7 @@ export async function makeTakrirPdf(students: S[], days: TakrirDay[], from: stri
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: ordered.length > 5 ? "landscape" : "portrait" });
   doc.addFileToVFS("DejaVuSans.ttf", regular); doc.addFont("DejaVuSans.ttf", "DejaVu", "normal");
   doc.addFileToVFS("DejaVuSans-Bold.ttf", bold); doc.addFont("DejaVuSans-Bold.ttf", "DejaVu", "bold");
-  doc.setFont("DejaVu", "bold"); doc.setFontSize(16); doc.text("Haftalık Takrir Raporu", 14, 18);
+  doc.setFont("DejaVu", "bold"); doc.setFontSize(16); doc.text(from === to ? "Günlük Takrir Raporu" : "Haftalık Takrir Raporu", 14, 18);
   doc.setFont("DejaVu", "normal"); doc.setFontSize(10); doc.setTextColor(90);
   doc.text(`${groupName} Grubu · ${full(from)} – ${full(to)} · ${ordered.length} takrir günü`, 14, 25);
   const listed = students.filter((s) => ordered.some((d) => s.id in d.results));

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createTakrirDay, setTakrir, takrirStats } from "./takrir";
+import { createTakrirDay, setTakrir, takrirStats, shiftTakrirDate, takrirReportRange } from "./takrir";
 
 describe("takrir", () => {
   it("a new takrir day starts everyone as vermedi", () => {
@@ -35,6 +35,13 @@ describe("takrir", () => {
 import { takrirRange, takrirDaysInRange } from "./takrir";
 describe("takrir geçmiş", () => {
   const sun = new Date(2026, 10, 8); // Pazar 8 Kasım 2026
+  it("dünden önceki gün seçilebilir", () => expect(shiftTakrirDate("2026-11-08", -2)).toBe("2026-11-06"));
+  it("önceki ve sonraki gün yıl sınırını geçer", () => {
+    expect(shiftTakrirDate("2026-01-01", -1)).toBe("2025-12-31");
+    expect(shiftTakrirDate("2025-12-31", 1)).toBe("2026-01-01");
+  });
+  it("günlük PDF yalnızca seçilen günü içerir", () => expect(takrirReportRange("2026-11-07", "day")).toEqual({ from: "2026-11-07", to: "2026-11-07" }));
+  it("haftalık PDF seçilen tarihin haftasını içerir", () => expect(takrirReportRange("2026-11-01", "week")).toEqual({ from: "2026-10-26", to: "2026-11-01" }));
   it("dün = bir önceki gün", () => expect(takrirRange("dun", sun)).toEqual({ from: "2026-11-07", to: "2026-11-07" }));
   it("bu hafta Pazartesi–Pazar", () => expect(takrirRange("bu-hafta", sun)).toEqual({ from: "2026-11-02", to: "2026-11-08" }));
   it("geçen hafta", () => expect(takrirRange("gecen-hafta", sun)).toEqual({ from: "2026-10-26", to: "2026-11-01" }));
